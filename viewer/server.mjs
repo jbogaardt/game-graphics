@@ -1,8 +1,8 @@
 // Zero-dependency static server for the sprite viewer.
 //   /                    -> viewer/index.html (and other files in viewer/)
-//   /dist/<file>         -> ../dist/<file>            (Aseprite exports: <name>_sheet.png / .json)
+//   /dist/<file>         -> ../dist/<file>            (<name>_doll.png, the game-layout sheet)
 //   /vendor/pixi.mjs     -> node_modules/pixi.js/dist/pixi.min.mjs
-//   /api/sprites         -> ["mummy", "player", ...]  (every dist/*_sheet.json)
+//   /api/sprites         -> ["mummy", ...]             (every dist/*_doll.png)
 // Usage: npm start   (PORT=5173 by default)
 import http from 'node:http';
 import { readFile, readdir } from 'node:fs/promises';
@@ -45,8 +45,8 @@ http
     const path = decodeURIComponent(url.pathname);
     if (path === '/api/sprites') {
       const names = (await readdir(distDir).catch(() => []))
-        .filter((f) => f.endsWith('_sheet.json'))
-        .map((f) => f.slice(0, -'_sheet.json'.length))
+        .filter((f) => f.endsWith('_doll.png'))
+        .map((f) => f.slice(0, -'_doll.png'.length))
         .sort();
       res.writeHead(200, { 'Content-Type': types['.json'], 'Cache-Control': 'no-store' });
       return res.end(JSON.stringify(names));

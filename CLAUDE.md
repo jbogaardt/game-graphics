@@ -4,87 +4,85 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Purpose
 
-Workflows for managing graphical assets (pixel-art sprites and sprite sheets) for games. There is no build system or test suite. Update this file as scripts, asset folders, or tooling are added.
+Turn generated (AI) sprite sheets into game-ready pixel-art sprites for `../me_rpg`. There is no test suite.
+Update this file as scripts, asset folders or tooling are added.
 
-## Asset pipeline
+## Workflow: the `sprite-sheet` skill
 
-```
-[Google Photos] → [Gemini / image gen] → raw sprite sheet PNG
-  → [Downscale & quantize] → snap to true pixel grid + fixed palette
-  → [Aseprite] → slice frames, set layers & tags
-  → [Claude Code + Aseprite MCP] → programmatic cleanup, outlines, animation tweaks
-```
+**Follow `.claude/skills/sprite-sheet/SKILL.md` for any sprite job.** It defines the stages and their gates:
+intake (is the sheet usable?) → spec → build preview → polish (patches) → review → export → report. Its
+`prompt-template.md` is the prompt to hand the image generator when a sheet must be regenerated or rows are
+missing. The lessons from the mummy job (sparkle, what failed, MCP gaps) are in the skill.
 
-### Step 1: Pre-process in Aseprite (manual)
-- Generated sheets are often high-res (e.g. 1024×1024). Determine the intended per-frame size (e.g. 32×32) and downscale with **Sprite > Sprite Size** using **Nearest Neighbor** only — never a smoothing filter.
-- Convert to indexed color (**Sprite > Color Mode > Convert to Indexed**) with a fixed palette (typically 16 or 32 colors) to eliminate blurred in-between pixels.
-- Split poses into sequential frames on the timeline.
+Hooks in `.claude/settings.json` (both `PostToolUse`, both only add a reminder):
+- after a live Aseprite `draw`/`recolor`/`transform`: copy edits to a built sprite into `assets/<name>/patches.json`,
+  or the next build loses them;
+- after a `Bash`/`Write` that puts an image into `assets/<name>/src/` (`.claude/hooks/intake_reminder.py`): run the
+  intake check and, if the sheet falls short, show the user `assess/regen_prompt.md` to steer the image generator.
 
-### Step 2: Refinement via MCP (Claude's role)
-With an Aseprite MCP server (e.g. `aseprite-mcp` / `aseprite-ai-artist`) connected, Claude inspects the canvas and runs Lua against the open Aseprite session. Expected tasks:
+For drawing a sprite from scratch (no source sheet) use the Aseprite MCP's own skills (`skill://brief`,
+`skill://concept`, `skill://draw`, `skill://animate`, `skill://review`) and its rulebook (`rules://index`,
+especially `rules://92-generated-art-tells` and `rules://32-heads-and-faces`).
 
-1. **Line cleanup ("de-jaggies")** — remove 2-pixel "doubles" on curved edges (hair, jawline) so curves are clean single-pixel lines.
-2. **Palette harmonization** — merge near-identical shades into defined highlight/shadow ramps and remap the canvas to the reduced palette.
-3. **Outlines** — add a layer named `Outline` *behind* the character on every frame with a 1px selective dark outline around the silhouette.
-4. **Frame alignment & timing** — find the bottom-most opaque pixel per frame and align all frames to a common baseline (e.g. `y=28` for 32px sprites) to stop jitter/sliding; set frame durations (e.g. 120ms) and tag ranges (e.g. `walk`).
+## Tools (`tools/`, run from the repo root with `uv run python -I tools/<tool>.py`)
 
-### Conventions when editing sprites
-- Preserve the hard pixel grid: no anti-aliasing, no non-nearest-neighbor resampling, no colors outside the active palette.
-- Apply edits across all frames of an animation consistently unless told otherwise.
-- Check which MCP server/tools are actually available in the session before assuming Lua access to Aseprite.
+| Tool | Does |
+|---|---|
+| `sheet_assess.py <img> [--spec S] [--out D]` | Intake report: background, rows and figures, ground line, scale, pixel-grid test, dirt, coverage of the views the game needs; writes `contact.png` and, unless the verdict is GO, `regen_prompt.md` (a filled-in prompt for Gemini asking for exactly what is wrong or missing); verdict GO / GO WITH GAPS / REGENERATE |
+| `spritekit.py` | Shared pipeline (key, dirt removal, luminance blur, form light, designed-ramp mapping, unfake on one atlas, register, stabilise, crumbs, wraps, head-anchored patches, metrics) |
+| `build_sprite.py <spec> [--preview]` | Spec to `layout.png`, `preview.png`, `<name>.aseprite` (Character + selective Outline layer, tags, durations) and `dist/<name>_sheet.png/.json` via the aseprite CLI. Close the sprite in Aseprite first |
+| `sprite_metrics.py <spec>` | Per-tag churn (sparkle), isolated pixels, feet rows, colours used, and the style check against the LPC reference characters (height, width, median brightness, near-black interior, outline thickness, colours); exits 3 if the style is off |
+| `export_doll.py <spec>` | `dist/<name>_sheet.*` to the game's doll layout `dist/<name>_doll.png/.json` (832x1600, mirrors `ANIMS` in `../me_rpg/src/sprites/doll.ts`), listing fallbacks |
+| `mummy_frames.py`, `unfake_test.py` | Legacy experiments on the old `mummy1/2.jpeg` sources; not part of the workflow |
 
-## Mummy sprite sheet (`assets/mummy/`, `tools/`)
+Each sprite lives in `assets/<name>/`: `src/` (source images), `sprite.json` (the spec: rows, clips, tags,
+designed palette, params, doll mapping, missing views), `patches.json` (hand-designed pixel templates and where
+they are stamped), and generated `layout.*`, `preview.png`, `assess/`, `<name>.aseprite`.
 
-Target game is `../me_rpg`: top-down, LPC paper-doll characters in **64×64 frames**, about **46px tall**, feet on row **y=61**, rows ordered up/left/down/right. The mummy is a standalone sheet, not an LPC part.
+Output guarantees: no anti-aliasing, no semi-transparent pixels, every colour from the spec palette (the build
+asserts this), feet on the baseline row.
 
-- Sources: `assets/mummy/src/mummy1.jpeg` (front view + side/attack rows) and `mummy2.jpeg` (back view row). Both are smooth AI art with a baked-in checkerboard — **not** on a pixel grid (edge-periodicity test found none), so nearest-neighbour downscaling gives noise.
-- `tools/mummy_frames.py` is the one exception to "nearest-neighbour only": it area-averages sprite pixels only (never the checkerboard), hard-thresholds alpha, stretches levels, snaps every frame to one shared 24-colour palette, majority-filters noise, and anchors by feet and torso centre. The output still has no anti-aliasing, no semi-transparent pixels and no off-palette colours. Keep that guarantee if you change it.
-- `tools/mummy_build.py` assembles tags (left = mirrored right; idle = breathing bob on a neutral walk pose; hurt = first death frames), builds `assets/mummy/mummy.aseprite` (Character + Outline layers, per-frame durations, 18 tags). Run from the repo root: `uv run python tools/mummy_build.py` — needs `aseprite` on PATH.
-- Export from the live window with the `export` MCP tool (packed sheet + JSON atlas) to `dist/mummy_sheet.png/.json`.
-- Only walk and idle exist for up/down; thrust, slash, shoot, hurt and death are left/right only (the source has no vertical views of them).
+## Target game (`../me_rpg`)
+
+Top-down, LPC paper-doll characters in **64x64 frames**, about **46 px tall**, feet on row **61**, rows
+up/left/down/right, light from the top left. Mobs render with the same `Character` class as the player, from a
+doll sheet: walk 9 cols, idle 2, cast 7, hurt 6 (one row), slash 6 in 128 px cells, shoot 13. Mobs use `cast` for
+ranged attacks and `slash` for melee. LPC reference art: `../me_rpg/public/sprites/lpc/` (e.g. `body.zombie.0.png`).
+
+## Mummy (`assets/mummy/`)
+
+- Source `src/mummy3.jpeg`: pharaoh mummy, flat magenta, rows 7,7,6,6,6,6,6,6. Row 0 is the **back** walk, row 1 the
+  side walk (right), rows 2-3 thrust, row 4 misc (frame 1 = front idle), row 5 slash (swings left), row 6 bow, row
+  7 hurt (0-1) + death. No front walk and no up/down attacks: `walk_down` and the up/down attack rows of the doll
+  sheet fall back to side views (listed in `dist/mummy_doll.json`). The user's own 16-colour unfake of the sheet,
+  `src/mummy3_unfaked.png`, is not used by the pipeline.
+- Palette (16 colours): outline, a hue-shifted 5-step linen ramp, gold 3, lapis 3, red 3, bone highlight. Linen
+  value `shares` put half the body on the lightest step, as in LPC.
+- Patches: `nemes_back`, `skull_front` (also used for the 3/4 attack poses) and `skull_profile` (with the false
+  beard) heads, stamped on every frame of their clips.
+- Params: `x_stretch` 1.32 (limited per clip for thrust, slash and shoot so weapons fit), `thin_darks` 4,
+  `form_light` 45, `wraps` 4 (bandage lines), `stable_tol` 44.
+- Style vs LPC zombie/skeleton walks: height 45 (46-47), width 28 (28), median brightness 144 (141-183), near-black
+  interior 12% (4-10%, within tolerance), outline ring 5% (4-10%), 14 colours. Churn: walks ~29%, idles ~18%,
+  attacks 32-47%. The first pass was ~58% churn and median brightness 36.
+- Shoot frame 1's bow tip touches the top of the 64 px cell.
+- Rebuild: `uv run python -I tools/build_sprite.py assets/mummy/sprite.json && uv run python -I tools/export_doll.py assets/mummy/sprite.json`.
 
 ## Sprite viewer (`viewer/`)
 
-`cd viewer && npm start` serves a PixiJS 8 page at http://localhost:5173/ that plays any `dist/<name>_sheet.json` + `.png` (Aseprite array-format atlas with tags named `<action>_<direction>`). Walk with WASD, attacks on `1`-`9`, `H` hurt, `X` die. Re-export a sheet and press Reload. See `viewer/README.md` for the tag conventions.
+`cd viewer && npm start` serves http://localhost:5173/?sprite=<name>, a minimal PixiJS page that plays
+`dist/<name>_doll.png` exactly as the game does (animation table, timings, feet anchor, shadow, walk speed, integer
+zoom; constants copied from `../me_rpg`). WASD walk, `1` slash, `2` cast, `3` shoot, `H` hurt, `R` reload after a
+rebuild. See `viewer/README.md`.
 
-## Lessons and known issues (read before starting a sprite job)
-
-Written after the mummy job, where the first pass was thrown away. Check these before spending tokens.
-
-**Before touching pixels**
-- Look at the target game first and write down frame size, character height, feet row, direction order and palette cap (see the mummy section for `../me_rpg`). Do not guess 32×32 from the generic pipeline above.
-- Test whether the source is on a pixel grid (edge-energy periodicity over periods 2-8; a ratio near 1.0 means no grid). AI "pixel art" almost never is. If it is not, say so up front: detail will not survive a ~2× or greater downscale and the result will be grainy.
-- Inspect the sheet rows for consistency before slicing: equal frame counts, same scale and ground line, a real walk cycle (one profile row turned mid-cycle), a baked-in checkerboard (JPEG noise breaks colour keys), missing idle or up/down attacks.
-
-**Mistakes to avoid**
-- Nearest-neighbour on non-grid AI art gives noise; area averaging gives grain. Neither fixes the source. Neither the majority filter, the palette cap nor the contrast stretch removed the grain.
-- Hand-drawing parts in Aseprite to fill missing views produced art that did not match the generated art. Prefer asking for the missing views from the image source.
-- Do not run `validate` unscoped on a many-frame sprite: it returns one finding per frame (about 140 results, almost all the `Outline` layer). Pass `checks` explicitly and skip `strays` for outline layers.
-- Pass `includePalette:false` to `sprite_info`; the palette dump is 256 entries.
-- Read crops of images, not the whole sheet, and do not re-view an unchanged sheet.
-
-**MCP gaps (`aseprite-live`)**
-- No "import sheet as N frames" op, so slicing needs `aseprite -b --script` Lua plus a file round-trip. The scripts in `tools/` already do this.
-- `validate` counts diagonal-only outline pixels as isolated: 2,837 flagged vs 118 when diagonals count as connected. Treat `Outline`-layer stray errors as false positives and say so.
-- Only the open document is editable live; scripts write files that must be reopened. Close the stale sprite first.
-
-**Token efficiency**
-- Put deterministic steps in scripts (`tools/mummy_frames.py`, `tools/mummy_build.py`) and rerun them; spend tokens on judgement and looking.
-- One batched call per layer or per task, one filmstrip per review round.
-
-**What to ask the image supplier for**
-- Exact target spec (cell size, character height, directions, palette size, flat shading, 1px dark outline, no anti-aliasing) plus a screenshot of the target game's sprites as a style reference.
-- PNG, a flat solid background (for example magenta), equal cells, same ground line, same frame count per row, one direction per row, an idle row, and attack rows for every direction wanted.
-- Ideally a generator that outputs a true pixel grid, or large blocks (each art pixel exactly 4×4) so downscaling is an exact integer. Or reuse LPC parts (`../me_rpg/public/sprites/lpc/`) and recolour them.
+`dist/` is committed: it holds only the current exports (`<name>_sheet.png/.json` Aseprite atlas and
+`<name>_doll.png/.json` game layout). Delete stale files when a sprite is renamed or dropped.
 
 ## Python tooling (uv)
 
-The repo is a uv project (`pyproject.toml`, `uv.lock`; `.venv/` is ignored). Run scripts with `uv run python tools/<script>.py`; add dependencies with `uv add`. Dependencies: `pillow`, `numpy`, `unfake` (which pulls in `opencv-python`; Python >= 3.12).
+uv project (`pyproject.toml`, `uv.lock`; `.venv/` ignored). Dependencies: `pillow`, `numpy`, `unfake` (pulls in
+`opencv-python`; Python >= 3.12). Add dependencies with `uv add`. `aseprite` must be on PATH for builds.
 
-### unfake test on the mummy (`tools/unfake_test.py`, output in `assets/mummy/unfake_test/`)
-
-`unfake` (https://pypi.org/project/unfake/) snaps AI pixel art to a true grid. On these sheets:
-- **Auto scale detection fails.** It collapsed 60×104 figures to 11×20 or smaller because the art has no grid.
-- **Manual `manual_scale=2`** gives a ~52px figure; `dominant` (picks real source colours instead of averaging) is slightly crisper than our area-average and keeps a bit more detail, but it is just another downscaler: the grain comes from the source texture, so it is not a fix. `median` and `content-adaptive` left magenta fringe when the key colour was used as background.
-- It adds no outline and has no notion of frames, so anchoring, mirroring and the shared palette still come from `tools/`.
-- Conclusion: unfake helps only when the source is already close to a pixel grid. For non-grid art, regenerate the source or reuse LPC parts.
+unfake findings: auto scale detection fails on smooth AI art (no grid); `manual_scale` with `dominant` works as a
+grid snapper on frames prepared at an exact integer multiple (the pipeline uses 4x), but it is a downscaler, not a
+fix for texture grain.

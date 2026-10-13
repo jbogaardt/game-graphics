@@ -1,0 +1,127 @@
+{
+  "_doc": "Hand-designed pixel grids stamped on clip frames by tools/build_sprite.py before mirroring. '.' keeps the pixel underneath, '_' erases it. anchor 'head' centres the grid on the detected head top; dx/dy nudge it; per_frame adds per-frame nudges. Templates face right (or front); left frames are mirrored copies. clear: [rows, margin] erases old pixels up to `margin` px beside the template's first `rows` rows and above it.",
+  "legend": {
+    "O": "#1d1016",
+    "G": "#f2cf6b",
+    "g": "#c8902f",
+    "d": "#7a4f22",
+    "N": "#1c2246",
+    "B": "#33508e",
+    "W": "#efe3c0",
+    "w": "#d0b986",
+    "R": "#f0585a",
+    "r": "#b0263a",
+    "l": "#84623f",
+    "m": "#5e3d2d",
+    "L": "#5b7fc4"
+  },
+  "templates": {
+    "nemes_back": {
+      "rows": [
+        "....OOOOOO....",
+        "..OOGGGGggOO..",
+        ".OGGLGgBgBgdO.",
+        ".OGLGLgBgBgBdO",
+        "OGLGLgBgBgBgdO",
+        "OGLGLgBgBgBgdO",
+        "OGLGLgBgBgBgdO",
+        "OGLGLgBgBgBgdO",
+        "OgLgLgBgBgBddO",
+        "OgLgBgBdBdBddO",
+        "OOdBdBdBdBdBOO",
+        ".OOOOOOOOOOOO."
+      ],
+      "clear": [10, 3]
+    },
+    "skull_front": {
+      "rows": [
+        ".....OOOOO.....",
+        "...OOGGGGgOO...",
+        "..OGGGgggggdO..",
+        ".OGLGBgBgBgBdO.",
+        ".OgOOOOOOOOOdO.",
+        "OGGOWWWWWwwOgdO",
+        "OBBOWOOWOOwOBBO",
+        "OGGOWROWROwOgdO",
+        "OBBOWWWOWwwOBBO",
+        "OggOOwOwOwOOgdO",
+        "OBBOOOwwwOOOBBO",
+        "OggOmOOOOOmOddO",
+        "OBBOmmlllmmOBBO",
+        "OddO.......OddO",
+        "OOOO.......OOOO"
+      ],
+      "clear": [11, 3]
+    },
+    "skull_profile": {
+      "rows": [
+        "..OOOOOOO....",
+        ".OGGGGGGgO...",
+        "OGgggggggdO..",
+        "OGBgBgBgBdOO.",
+        "OBBBBBOOOOOO.",
+        "OGGgggOWWWwO.",
+        "OBBBBBOWOOwO.",
+        "OGgggdOWROwwO",
+        "OBBBBBOWWWwO.",
+        "OGgggdOwOwOO.",
+        "OBBBBBOwwwO..",
+        "OggggdOOOO...",
+        ".OOOOO..OGgO.",
+        "........OBBO.",
+        "........OGgO.",
+        ".........OO.."
+      ],
+      "clear": [12, 3]
+    }
+  },
+  "apply": [
+    {
+      "clip": "walk_up",
+      "template": "nemes_back"
+    },
+    {
+      "clip": "walk_right",
+      "template": "skull_profile"
+    },
+    {
+      "clip": "idle_down",
+      "template": "skull_front"
+    },
+    {
+      "clip": "hurt_down",
+      "template": "skull_front"
+    },
+    {
+      "clip": "thrust_right",
+      "template": "skull_front",
+      "dx": 1
+    },
+    {
+      "clip": "shoot_right",
+      "template": "skull_front",
+      "dx": 1
+    },
+    {
+      "clip": "slash_left",
+      "template": "skull_front",
+      "dx": -1,
+      "per_frame": {
+        "0": {
+          "clear": [0, 0]
+        },
+        "1": {
+          "clear": [0, 0]
+        },
+        "2": {
+          "clear": [0, 0]
+        }
+      }
+    },
+    {
+      "clip": "death_down",
+      "template": "skull_front",
+      "frames": [0, 1]
+    }
+  ]
+}

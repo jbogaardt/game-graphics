@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "mcp__aseprite-live__draw|mcp__aseprite-live__recolor|mcp__aseprite-live__transform",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"Sprite-sheet workflow: if this edit is on a sprite built by tools/build_sprite.py (assets/<name>/<name>.aseprite), the next build overwrites it. Copy the final pixels into assets/<name>/patches.json (a template plus an apply rule) before you finish.\"}}'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/intake_reminder.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

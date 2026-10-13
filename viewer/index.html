@@ -5,301 +5,135 @@
 <title>Sprite viewer</title>
 <script type="importmap">{ "imports": { "pixi.js": "/vendor/pixi.mjs" } }</script>
 <style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body { margin: 0; height: 100vh; display: grid; grid-template-columns: 290px 1fr; font: 13px/1.4 system-ui, sans-serif; background: #15161a; color: #d8d8de; }
-  #panel { padding: 12px; overflow-y: auto; border-right: 1px solid #2b2d35; background: #1b1c22; }
-  #stage { position: relative; min-width: 0; }
-  #stage canvas { display: block; }
-  h1 { font-size: 14px; margin: 0 0 8px; }
-  h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #8a8d99; margin: 14px 0 6px; }
-  label { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0; }
-  select, input[type=range] { flex: 1; min-width: 0; }
-  select, button { background: #262830; color: inherit; border: 1px solid #3a3d48; border-radius: 4px; padding: 4px 8px; font: inherit; }
-  button { cursor: pointer; } button:hover { background: #31343e; } button.on { background: #3b5bdb; border-color: #5c7cfa; }
-  .tags { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
-  .tags button { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .group { grid-column: 1 / -1; color: #8a8d99; font-size: 11px; margin-top: 6px; }
-  kbd { background: #2b2d35; border-radius: 3px; padding: 0 4px; border: 1px solid #3a3d48; font: 11px monospace; }
-  #hud { position: absolute; left: 10px; top: 8px; pointer-events: none; font: 12px/1.5 ui-monospace, monospace; color: #cfd2dc; text-shadow: 0 1px 2px #000; white-space: pre; }
-  #err { color: #ff8787; white-space: pre-wrap; }
-  .keys div { margin: 2px 0; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+  #hud { position: fixed; left: 8px; top: 6px; font: 12px/1.5 ui-monospace, monospace; color: #e8e8e8; text-shadow: 0 1px 2px #000; white-space: pre; pointer-events: none; }
 </style>
 </head>
 <body>
-<div id="panel">
-  <h1>Sprite viewer</h1>
-  <label>Sprite <select id="sprite"></select></label>
-  <button id="reload" title="Re-read the sheet from dist/ after re-exporting">Reload sheet</button>
-  <div id="err"></div>
-
-  <h2>View</h2>
-  <label>Zoom <select id="zoom"><option>2</option><option>3</option><option>4</option><option selected>6</option><option>8</option><option>10</option></select></label>
-  <label>Animation speed <input id="aspeed" type="range" min="0.2" max="2" step="0.05" value="1" /></label>
-  <label>Walk speed <input id="wspeed" type="range" min="10" max="160" step="5" value="60" /></label>
-  <label>Background <select id="bg"><option value="#2a2d34">Dark</option><option value="#8fbf6a">Grass</option><option value="#d9c9a0">Sand</option><option value="#f2f2f2">Light</option></select></label>
-  <label><span>Cell box</span> <input id="box" type="checkbox" /></label>
-  <label><span>Shadow</span> <input id="shadow" type="checkbox" checked /></label>
-
-  <h2>Play a tag (loops)</h2>
-  <div class="tags" id="tags"></div>
-  <p><button id="demo">Demo: cycle all tags</button> <button id="pause">Pause</button></p>
-
-  <h2>Controls</h2>
-  <div class="keys" id="keys"></div>
-</div>
-<div id="stage"><div id="hud"></div></div>
-
+<div id="hud"></div>
 <script type="module">
-import { Application, Assets, Container, Graphics, Rectangle, Sprite, Texture, TextureStyle } from 'pixi.js';
+// Plays dist/<name>_doll.png exactly the way ../me_rpg does (src/sprites/doll.ts + src/entities/Character.ts):
+// the same animation blocks, cycles and timings, feet anchor, shadow, walk speed and integer camera zoom.
+import { Application, Container, Graphics, Rectangle, Sprite, Texture, Assets, TextureStyle } from 'pixi.js';
 
 TextureStyle.defaultOptions.scaleMode = 'nearest';
 
-const $ = (id) => document.getElementById(id);
-const DIRS = ['up', 'left', 'down', 'right'];
-const MOVE = new Set(['walk', 'run']);
-const SYSTEM = new Set(['idle', 'walk', 'run', 'hurt', 'death']);
-const query = new URLSearchParams(location.search);
+// ---- copied from ../me_rpg (keep in step with src/sprites/doll.ts, src/core/camera.ts, overworld SPEED) ----
+const ANIMS = {
+  walk: { y: 0, size: 64, cols: 9, rows: 4, cycle: [1, 2, 3, 4, 5, 6, 7, 8], ms: 90, once: false },
+  idle: { y: 256, size: 64, cols: 2, rows: 4, cycle: [0, 0, 0, 1], ms: 350, once: false },
+  cast: { y: 512, size: 64, cols: 7, rows: 4, cycle: [0, 1, 2, 3, 4, 5, 6], ms: 60, once: true },
+  hurt: { y: 768, size: 64, cols: 6, rows: 1, cycle: [0, 1, 2, 3, 4, 5], ms: 70, once: true },
+  slash: { y: 832, size: 128, cols: 6, rows: 4, cycle: [0, 1, 2, 3, 4, 5], ms: 55, once: true },
+  shoot: { y: 1344, size: 64, cols: 13, rows: 4, cycle: [5, 6, 7, 8, 9, 10, 11, 12], ms: 50, once: true },
+};
+const DIR_ROW = { up: 0, left: 1, down: 2, right: 3 };
+const FEET_Y_64 = 62;
+const feetAnchor = (anim) => (FEET_Y_64 + (ANIMS[anim].size - 64) / 2) / ANIMS[anim].size;
+const pickZoom = (w, h) => Math.max(1, Math.round(Math.min(w / 640, h / 440)));
+const SPEED = 120; // px per second
+const CELL = 32;   // map tile size
+// -------------------------------------------------------------------------------------------------------------
 
 const app = new Application();
-await app.init({ resizeTo: $('stage'), background: '#2a2d34', antialias: false, resolution: devicePixelRatio, autoDensity: true, roundPixels: true });
-$('stage').prepend(app.canvas);
+await app.init({ background: '#000000', resizeTo: window, antialias: false, roundPixels: true, resolution: devicePixelRatio || 1, autoDensity: true });
+document.body.prepend(app.canvas);
 
 const world = new Container();
-const floor = new Graphics();
-const shadow = new Graphics();
-const actor = new Sprite();
-const cellBox = new Graphics();
-world.addChild(floor, shadow, actor, cellBox);
+const ground = new Graphics();
+const shadow = new Graphics().ellipse(0, 0, 10, 4).fill({ color: 0x000000, alpha: 0.35 });
+const body = new Sprite();
+const actor = new Container();
+actor.addChild(shadow, body);
+world.addChild(ground, actor);
 app.stage.addChild(world);
 
-// ---- sheet loading -------------------------------------------------------------------------
-let sheet = null; // { name, tags: Map<string, Tag>, actions: Set<string>, cell:{w,h}, feet }
-const keys = new Set();
-const st = { mode: 'free', state: 'normal', facing: 'down', side: 'right', x: 0, y: 0, tag: null, frame: 0, t: 0, loops: 0, paused: false, once: false, demo: null, demoLeft: 0 };
+const names = await (await fetch('/api/sprites')).json();
+const query = new URLSearchParams(location.search);
+let name = query.get('sprite') ?? names[0];
+let frames = null;
 
-async function loadSheet(name) {
-  $('err').textContent = '';
-  const v = Date.now();
-  const atlas = await (await fetch(`/dist/${name}_sheet.json?v=${v}`)).json();
-  Assets.cache.remove?.(`/dist/${name}_sheet.png?v=${v}`);
-  const base = await Assets.load(`/dist/${name}_sheet.png?v=${v}`);
-  const frames = (Array.isArray(atlas.frames) ? atlas.frames : Object.values(atlas.frames)).map((f) => ({
-    tex: new Texture({ source: base.source, frame: new Rectangle(f.frame.x, f.frame.y, f.frame.w, f.frame.h) }),
-    dur: f.duration || 100,
-  }));
-  const tags = new Map();
-  for (const t of atlas.meta.frameTags ?? []) {
-    const idx = [];
-    for (let i = t.from; i <= t.to; i++) idx.push(i);
-    if (t.direction === 'reverse') idx.reverse();
-    if (t.direction === 'pingpong' && idx.length > 2) idx.push(...idx.slice(1, -1).reverse());
-    const m = /^(.*)_(up|down|left|right)$/.exec(t.name);
-    tags.set(t.name, { name: t.name, action: m ? m[1] : t.name, dir: m ? m[2] : null, frames: idx.map((i) => frames[i]) });
+async function load() {
+  const url = `/dist/${name}_doll.png?v=${Date.now()}`;
+  const base = await Assets.load(url);
+  frames = {};
+  for (const [anim, a] of Object.entries(ANIMS)) {
+    frames[anim] = {};
+    for (const dir of Object.keys(DIR_ROW)) {
+      const row = a.rows === 1 ? 0 : DIR_ROW[dir];
+      frames[anim][dir] = Array.from({ length: a.cols }, (_, col) =>
+        new Texture({ source: base.source, frame: new Rectangle(col * a.size, a.y + row * a.size, a.size, a.size) }));
+    }
   }
-  if (!tags.size) tags.set('all', { name: 'all', action: 'all', dir: null, frames });
-  const actions = new Set([...tags.values()].map((t) => t.action));
-  const cell = { w: frames[0].tex.width, h: frames[0].tex.height };
-  const feet = Number(query.get('feet')) || Math.round(cell.h * 0.97);
-  sheet = { name, tags, actions, cell, feet };
-  actor.anchor.set(0.5, feet / cell.h);
-  buildPanel();
-  resetActor();
-  document.title = `${name} - Sprite viewer`;
 }
 
-// ---- tag resolution ------------------------------------------------------------------------
-function resolve(action, facing = st.facing) {
-  const t = sheet.tags;
-  return (
-    t.get(`${action}_${facing}`) ??
-    t.get(`${action}_${st.side}`) ??               // up/down fall back to the last left/right facing
-    t.get(`${action}_${st.side === 'left' ? 'right' : 'left'}`) ??
-    t.get(action) ??
-    [...t.values()].find((x) => x.action === action) ?? null
-  );
-}
-const has = (a) => sheet.actions.has(a);
-
-function play(tag, { once = false } = {}) {
-  if (!tag) return;
-  if (st.tag !== tag || once) { st.tag = tag; st.frame = 0; st.t = 0; st.loops = 0; }
-  st.once = once;
-}
-
-function resetActor() {
-  st.state = 'normal'; st.mode = 'free'; st.facing = 'down'; st.demo = null;
-  st.x = app.screen.width / 2 / zoom(); st.y = app.screen.height * 0.62 / zoom();
-  play(resolve('idle'));
-  syncButtons();
-}
-
-// ---- input ---------------------------------------------------------------------------------
-const attackActions = () => [...sheet.actions].filter((a) => !SYSTEM.has(a) && a !== 'all');
+// state, as in Character: looping idle/walk unless a one-shot action is playing
+const st = { x: 0, y: 0, dir: 'down', loopAnim: 'idle', loopTime: 0, action: null };
+const keys = new Set();
+const ACTIONS = { 1: 'slash', 2: 'cast', 3: 'shoot', h: 'hurt' };
 addEventListener('keydown', (e) => {
-  if (e.target instanceof HTMLSelectElement) return;
   const k = e.key.toLowerCase();
-  if (k === ' ') { st.paused = !st.paused; $('pause').textContent = st.paused ? 'Resume' : 'Pause'; e.preventDefault(); return; }
-  if (k === '.' && st.paused) { stepFrame(1); return; }
-  if (k === ',' && st.paused) { stepFrame(-1); return; }
-  if (!sheet) return;
-  const acts = attackActions();
-  if (/^[1-9]$/.test(k) && acts[Number(k) - 1]) return doAction(acts[Number(k) - 1]);
-  if (k === 'h' && has('hurt')) return doAction('hurt');
-  if (k === 'x' && has('death')) return doDeath();
-  if (k === 'r') return resetActor();
+  if (ACTIONS[k]) st.action = { anim: ACTIONS[k], time: 0 };
+  else if (k === 'r') load();
+  else if (k === 'n' && names.length > 1) { name = names[(names.indexOf(name) + 1) % names.length]; load(); }
   keys.add(k);
-  if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) e.preventDefault();
 });
 addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
-addEventListener('blur', () => keys.clear());
 
-function doAction(action) {
-  if (st.state === 'dead') return;
-  st.mode = 'free'; st.demo = null; st.state = action === 'hurt' ? 'hurt' : 'attack';
-  play(resolve(action), { once: true });
-  syncButtons();
-}
-function doDeath() {
-  st.mode = 'free'; st.demo = null; st.state = 'dead';
-  play(resolve('death'), { once: true });
-  syncButtons();
-}
-function stepFrame(d) {
-  if (!st.tag) return;
-  st.frame = (st.frame + d + st.tag.frames.length) % st.tag.frames.length; st.t = 0;
-}
-
-// ---- simulation ----------------------------------------------------------------------------
-const zoom = () => Number($('zoom').value);
-function update(dtMs) {
-  if (!sheet) return;
-  const dt = dtMs / 1000;
-  const speed = Number($('wspeed').value);
-
-  if (st.mode === 'free' && st.state === 'normal') {
-    const dx = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
-    const dy = (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - (keys.has('w') || keys.has('arrowup') ? 1 : 0);
-    if (dx || dy) {
-      const len = Math.hypot(dx, dy);
-      st.x += (dx / len) * speed * dt; st.y += (dy / len) * speed * dt;
-      st.facing = Math.abs(dx) >= Math.abs(dy) && dx ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up';
-      if (st.facing === 'left' || st.facing === 'right') st.side = st.facing;
-      play(resolve(has('walk') ? 'walk' : 'idle'));
-    } else {
-      play(resolve('idle'));
-    }
+function pose(dt, moving) {
+  const act = st.action;
+  if (act) {
+    act.time += dt;
+    const { cycle, ms } = ANIMS[act.anim];
+    const step = Math.floor(act.time / ms);
+    if (step < cycle.length) return [act.anim, cycle[step]];
+    st.action = null;
   }
-  st.x = Math.max(20, Math.min(app.screen.width / zoom() - 20, st.x));
-  st.y = Math.max(40, Math.min(app.screen.height / zoom() - 6, st.y));
-
-  if (st.demo !== null) {
-    st.demoLeft -= dtMs;
-    if (st.demoLeft <= 0) nextDemo();
-  }
-
-  if (!st.paused && st.tag) {
-    st.t += dtMs * Number($('aspeed').value);
-    for (;;) {
-      const f = st.tag.frames[st.frame];
-      if (st.t < f.dur) break;
-      st.t -= f.dur;
-      if (st.frame + 1 < st.tag.frames.length) { st.frame++; continue; }
-      if (st.once) {                                   // one-shots hold or hand control back
-        st.t = 0;
-        if (st.state === 'attack' || st.state === 'hurt') { st.state = 'normal'; play(resolve('idle')); }
-        else st.t = 0;
-        break;
-      }
-      st.frame = 0; st.loops++;
-    }
-  }
+  const anim = moving ? 'walk' : 'idle';
+  if (anim !== st.loopAnim) st.loopTime = 0;
+  st.loopAnim = anim;
+  st.loopTime += dt;
+  const { cycle, ms } = ANIMS[anim];
+  return [anim, cycle[Math.floor(st.loopTime / ms) % cycle.length]];
 }
 
-// ---- drawing -------------------------------------------------------------------------------
-function draw() {
-  const z = zoom();
-  world.scale.set(z);
-  app.renderer.background.color = $('bg').value;
-  const f = st.tag?.frames[Math.min(st.frame, st.tag.frames.length - 1)];
-  if (f) actor.texture = f.tex;
+function drawGround(zoom) {
+  // a plain tiled field: enough to see the feet land and the sprite move, no more
+  const w = Math.ceil(app.screen.width / zoom / CELL) + 2, h = Math.ceil(app.screen.height / zoom / CELL) + 2;
+  ground.clear();
+  for (let ty = -h; ty <= h; ty++)
+    for (let tx = -w; tx <= w; tx++)
+      ground.rect(tx * CELL, ty * CELL, CELL, CELL).fill((tx + ty) & 1 ? 0x5d7d43 : 0x587640);
+}
+
+await load();
+let lastZoom = 0;
+app.ticker.add((t) => {
+  if (!frames) return;
+  const dt = t.deltaMS;
+  const dx = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
+  const dy = (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - (keys.has('w') || keys.has('arrowup') ? 1 : 0);
+  const moving = (dx || dy) && !st.action;
+  if (moving) {
+    st.dir = dx ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up';
+    const n = Math.hypot(dx, dy);
+    st.x += (dx / n) * SPEED * dt / 1000;
+    st.y += (dy / n) * SPEED * dt / 1000;
+  }
+  const [anim, col] = pose(dt, moving);
+  body.texture = frames[anim][st.dir][col];
+  body.anchor.set(0.5, feetAnchor(anim));
+  const zoom = pickZoom(app.screen.width, app.screen.height);
+  if (zoom !== lastZoom) { drawGround(zoom); lastZoom = zoom; }
+  world.scale.set(zoom);
+  // camera follows the actor; the field repeats every 2 tiles so it is drawn once and wrapped
+  const wrap = 2 * CELL;
+  ground.position.set(Math.floor(st.x / wrap) * wrap, Math.floor(st.y / wrap) * wrap);
   actor.position.set(Math.round(st.x), Math.round(st.y));
-  shadow.clear();
-  if ($('shadow').checked) shadow.ellipse(Math.round(st.x), Math.round(st.y) - 1, 11, 3.5).fill({ color: 0x000000, alpha: 0.28 });
-  cellBox.clear();
-  if ($('box').checked && sheet) {
-    const w = sheet.cell.w, h = sheet.cell.h;
-    cellBox.rect(Math.round(st.x) - w / 2, Math.round(st.y) - sheet.feet, w, h).stroke({ width: 1 / z, color: 0xff6b6b, alpha: 0.8 });
-  }
-  floor.clear();
-  const W = app.screen.width / z, H = app.screen.height / z, g = 16;
-  for (let x = 0; x < W; x += g) floor.moveTo(x, 0).lineTo(x, H);
-  for (let y = 0; y < H; y += g) floor.moveTo(0, y).lineTo(W, y);
-  floor.stroke({ width: 1 / z, color: 0xffffff, alpha: 0.06 });
-
-  const tag = st.tag;
-  $('hud').textContent = tag
-    ? `${sheet.name}   tag: ${tag.name}   frame ${st.frame + 1}/${tag.frames.length}   ${f ? f.dur : 0}ms` +
-      `\nstate: ${st.state}${st.mode === 'tag' ? ' (tag loop)' : ''}${st.demo !== null ? ' (demo)' : ''}   facing: ${st.facing}${st.paused ? '   PAUSED' : ''}` +
-      (st.state === 'dead' ? '\npress R to revive' : '')
-    : '';
-}
-
-// ---- panel ---------------------------------------------------------------------------------
-function buildPanel() {
-  const box = $('tags'); box.textContent = '';
-  const groups = new Map();
-  for (const t of sheet.tags.values()) (groups.get(t.action) ?? groups.set(t.action, []).get(t.action)).push(t);
-  for (const [action, list] of groups) {
-    const h = document.createElement('div'); h.className = 'group'; h.textContent = action; box.append(h);
-    list.sort((a, b) => DIRS.indexOf(a.dir) - DIRS.indexOf(b.dir));
-    for (const t of list) {
-      const b = document.createElement('button'); b.textContent = t.dir ?? t.name; b.dataset.tag = t.name; b.title = `${t.name} (${t.frames.length} frames)`;
-      b.onclick = () => { st.mode = 'tag'; st.state = 'normal'; st.demo = null; if (t.dir) { st.facing = t.dir; if (t.dir === 'left' || t.dir === 'right') st.side = t.dir; } play(t, { once: t.action === 'death' }); if (t.action === 'death') st.state = 'dead'; syncButtons(); };
-      box.append(b);
-    }
-  }
-  const acts = attackActions();
-  $('keys').innerHTML = [
-    '<div><kbd>WASD</kbd> / <kbd>arrows</kbd> walk (idle when still)</div>',
-    ...acts.map((a, i) => `<div><kbd>${i + 1}</kbd> ${a}</div>`),
-    has('hurt') ? '<div><kbd>H</kbd> hurt</div>' : '',
-    has('death') ? '<div><kbd>X</kbd> die &nbsp; <kbd>R</kbd> revive</div>' : '<div><kbd>R</kbd> reset</div>',
-    '<div><kbd>Space</kbd> pause, then <kbd>,</kbd> <kbd>.</kbd> step frames</div>',
-  ].join('');
-}
-function syncButtons() {
-  for (const b of $('tags').querySelectorAll('button')) b.classList.toggle('on', st.mode === 'tag' && st.tag?.name === b.dataset.tag);
-}
-
-function nextDemo() {
-  const list = [...sheet.tags.values()];
-  st.demo = st.demo === true ? 0 : (st.demo + 1) % list.length;
-  const t = list[st.demo];
-  st.mode = 'tag'; st.state = 'normal'; st.facing = t.dir ?? st.facing;
-  if (t.dir === 'left' || t.dir === 'right') st.side = t.dir;
-  play(t, { once: false }); st.tag = t; st.frame = 0; st.t = 0;
-  const cycle = t.frames.reduce((s, f) => s + f.dur, 0) / Number($('aspeed').value);
-  st.demoLeft = Math.max(1400, cycle * Math.ceil(1400 / cycle));
-  syncButtons();
-}
-$('demo').onclick = () => { if (st.demo !== null) { st.demo = null; st.mode = 'free'; resetActor(); } else { st.demo = true; nextDemo(); } };
-$('pause').onclick = () => { st.paused = !st.paused; $('pause').textContent = st.paused ? 'Resume' : 'Pause'; };
-$('reload').onclick = () => start($('sprite').value);
-$('sprite').onchange = () => { history.replaceState(null, '', `?sprite=${$('sprite').value}`); start($('sprite').value); };
-addEventListener('resize', () => sheet && resetActorPosition());
-function resetActorPosition() { st.x = Math.min(st.x, app.screen.width / zoom()); }
-
-async function start(name) {
-  try { await loadSheet(name); } catch (e) { $('err').textContent = `Could not load "${name}": ${e.message}\nExport ${name}_sheet.png + ${name}_sheet.json to ../dist first.`; }
-}
-
-app.ticker.add((t) => { update(t.deltaMS); draw(); });
-
-const names = await (await fetch('/api/sprites')).json();
-$('sprite').innerHTML = names.map((n) => `<option>${n}</option>`).join('');
-const first = names.includes(query.get('sprite')) ? query.get('sprite') : names[0];
-if (first) { $('sprite').value = first; start(first); } else $('err').textContent = 'No *_sheet.json found in ../dist';
+  world.position.set(Math.round(app.screen.width / 2 - st.x * zoom), Math.round(app.screen.height / 2 - st.y * zoom));
+  document.getElementById('hud').textContent =
+    `${name}  ${anim} ${st.dir} col ${col}   zoom ${zoom}x\nWASD move  1 slash  2 cast  3 shoot  H hurt  R reload${names.length > 1 ? '  N next sprite' : ''}`;
+});
 </script>
 </body>
 </html>
