@@ -1,0 +1,9 @@
+[project]
+name = "game-graphics"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.5.4",
+    "pillow>=12.3.0",
+    "unfake>=1.0.7",
+]

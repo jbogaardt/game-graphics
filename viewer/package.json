@@ -1,0 +1,8 @@
+{
+  "name": "sprite-viewer",
+  "private": true,
+  "type": "module",
+  "description": "Local PixiJS viewer for Aseprite sprite sheets exported to ../dist (<name>_sheet.png + .json)",
+  "scripts": { "start": "node server.mjs" },
+  "dependencies": { "pixi.js": "^8.22.0" }
+}
