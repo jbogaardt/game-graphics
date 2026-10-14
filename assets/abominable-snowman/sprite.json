@@ -1,0 +1,458 @@
+{
+  "name": "abominable-snowman",
+  "subject": "an abominable snowman (yeti): hulking white-and-pale-blue furred body, slate-blue hands, feet and face, curled tan ram horns, glowing cyan eyes, fanged mouth",
+  "source": "assets/abominable-snowman/src/yeti_v01_stitched.png",
+  "background": [
+    251,
+    2,
+    248
+  ],
+  "rows": [
+    8,
+    8,
+    8,
+    8,
+    8,
+    6
+  ],
+  "row_notes": [
+    "walk facing down (front), 8",
+    "walk facing up (back), 8",
+    "walk facing right (side), 8",
+    "front: stand (0), arms raised (1-2), slam crouch (3-4), stand (5-7)",
+    "back: arms raised (0-2), stand/walk (3-7)",
+    "side right: hunch (0), fist up (1), lunge (2), knocked back (3), slump (4), lying (5)"
+  ],
+  "stitch": "tools/stitch_sheets.py assets/abominable-snowman/src/yeti_v01_stitched.png src/Gemini_Generated_Image_ozp1emozp1emozp1.jpeg (walk) src/Gemini_Generated_Image_aq0mhtaq0mhtaq0m.jpeg (action) --drop 1636,2885 --drop 2386,2862 --drop 2122,3155 (floating head, tiny head, fused lying frames)",
+  "target": {
+    "game": "../me_rpg",
+    "cell": 64,
+    "body_h": 46,
+    "baseline": 61,
+    "scale_ref": "walk_down",
+    "reference": {
+      "dir": "../me_rpg/public/sprites/lpc",
+      "sets": [
+        [
+          "body.zombie.0.png",
+          "head.zombie.0.png"
+        ],
+        [
+          "body.skeleton.0.png",
+          "head.skeleton.0.png"
+        ]
+      ]
+    },
+    "style_tolerance": {
+      "width": 8,
+      "median_lum": 45
+    }
+  },
+  "palette": {
+    "outline": "#1a1c3f",
+    "outline_below": 40,
+    "materials": {
+      "fur": {
+        "ramp": [
+          "#3a3570",
+          "#56609a",
+          "#7f93c6",
+          "#b4cbec",
+          "#eef6ff"
+        ],
+        "range": [
+          3,
+          98
+        ],
+        "shares": [
+          0.06,
+          0.16,
+          0.34,
+          0.66,
+          1.0
+        ],
+        "thin_max_step": 2
+      },
+      "horn": {
+        "hue": [
+          15,
+          55
+        ],
+        "sat": 30,
+        "val": 90,
+        "ramp": [
+          "#5e4636",
+          "#93785e",
+          "#c9b28e"
+        ]
+      },
+      "glow": {
+        "hue": [
+          170,
+          200
+        ],
+        "sat": 100,
+        "val": 170,
+        "ramp": [
+          "#3fd6ef",
+          "#c9fbff"
+        ]
+      }
+    },
+    "extra": []
+  },
+  "params": {
+    "form_light": 20,
+    "stable_tol": 36,
+    "x_stretch": 1.0,
+    "smooth": 0.5,
+    "wraps": 0,
+    "thin_darks": 2,
+    "row_scale": {
+      "1": 0.914,
+      "2": 0.94,
+      "4": 0.914,
+      "5": 0.95
+    }
+  },
+  "clips": {
+    "walk_down": [
+      [
+        0,
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      ]
+    ],
+    "walk_up": [
+      [
+        1,
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      ]
+    ],
+    "walk_right": [
+      [
+        2,
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      ]
+    ],
+    "idle_down": [
+      [
+        3,
+        [
+          0
+        ]
+      ]
+    ],
+    "idle_up": [
+      [
+        4,
+        [
+          3
+        ]
+      ]
+    ],
+    "smash_down": [
+      [
+        3,
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      ]
+    ],
+    "smash_up": [
+      [
+        4,
+        [
+          0,
+          1,
+          2,
+          3
+        ]
+      ]
+    ],
+    "smash_right": [
+      [
+        5,
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    ],
+    "death_right": [
+      [
+        5,
+        [
+          3,
+          4,
+          5
+        ]
+      ]
+    ]
+  },
+  "tags": [
+    {
+      "name": "idle_up",
+      "clip": "idle_up",
+      "idle": 0,
+      "durations": [
+        240,
+        240,
+        240,
+        240
+      ]
+    },
+    {
+      "name": "idle_left",
+      "clip": "walk_right",
+      "idle": 0,
+      "mirror": true,
+      "durations": [
+        240,
+        240,
+        240,
+        240
+      ]
+    },
+    {
+      "name": "idle_down",
+      "clip": "idle_down",
+      "idle": 0,
+      "durations": [
+        240,
+        240,
+        240,
+        240
+      ]
+    },
+    {
+      "name": "idle_right",
+      "clip": "walk_right",
+      "idle": 0,
+      "durations": [
+        240,
+        240,
+        240,
+        240
+      ]
+    },
+    {
+      "name": "walk_up",
+      "clip": "walk_up",
+      "durations": [
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120
+      ]
+    },
+    {
+      "name": "walk_left",
+      "clip": "walk_right",
+      "mirror": true,
+      "durations": [
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120
+      ]
+    },
+    {
+      "name": "walk_down",
+      "clip": "walk_down",
+      "durations": [
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120
+      ]
+    },
+    {
+      "name": "walk_right",
+      "clip": "walk_right",
+      "durations": [
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120
+      ]
+    },
+    {
+      "name": "smash_up",
+      "clip": "smash_up",
+      "order": [
+        3,
+        0,
+        1,
+        2,
+        2,
+        3
+      ],
+      "durations": [
+        120,
+        160,
+        200,
+        70,
+        220,
+        140
+      ]
+    },
+    {
+      "name": "smash_left",
+      "clip": "smash_right",
+      "order": [
+        0,
+        1,
+        1,
+        2,
+        2,
+        0
+      ],
+      "mirror": true,
+      "durations": [
+        120,
+        160,
+        200,
+        70,
+        220,
+        140
+      ]
+    },
+    {
+      "name": "smash_down",
+      "clip": "smash_down",
+      "order": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "durations": [
+        120,
+        160,
+        200,
+        70,
+        220,
+        140
+      ]
+    },
+    {
+      "name": "smash_right",
+      "clip": "smash_right",
+      "order": [
+        0,
+        1,
+        1,
+        2,
+        2,
+        0
+      ],
+      "durations": [
+        120,
+        160,
+        200,
+        70,
+        220,
+        140
+      ]
+    },
+    {
+      "name": "death_left",
+      "clip": "death_right",
+      "order": [
+        0,
+        1,
+        2,
+        2
+      ],
+      "mirror": true,
+      "once": true,
+      "durations": [
+        120,
+        180,
+        240,
+        600
+      ]
+    },
+    {
+      "name": "death_right",
+      "clip": "death_right",
+      "order": [
+        0,
+        1,
+        2,
+        2
+      ],
+      "once": true,
+      "durations": [
+        120,
+        180,
+        240,
+        600
+      ]
+    }
+  ],
+  "doll": {
+    "walk": "walk",
+    "idle": "idle",
+    "cast": "smash",
+    "slash": "smash",
+    "shoot": "smash",
+    "hurt": "death_right"
+  },
+  "missing": [
+    "ranged attack: none in the source; cast and shoot reuse the melee smash",
+    "hit reaction: none separate; hurt is the death collapse (side view), as in LPC",
+    "idle breathing: one frame per view with a built-in breathing bob"
+  ]
+}

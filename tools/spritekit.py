@@ -96,6 +96,10 @@ def remove_dirt(rgb, fg, box, dark_wall=90):
     wall = cv2.dilate(((l < dark_wall) & f).astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool) & f
     _, lab = cv2.connectedComponents((~f | ~wall).astype(np.uint8), connectivity=4)
     keep = f & ~np.isin(lab, np.unique(lab[~f]))
+    if keep.sum() < 0.75 * f.sum():
+        # the flood leaked through gaps in a thin outline into the body (light figures such as white fur):
+        # that is not dirt, so keep the figure and drop only small loose pieces
+        keep = f
     n, lab, st, _ = cv2.connectedComponentsWithStats(keep.astype(np.uint8), connectivity=8)
     if n < 2:
         return f
@@ -465,7 +469,8 @@ def make_frames(spec, log=print):
     clips = {k: [(r, i) for r, idx in v for i in idx] for k, v in spec["clips"].items()}
     ref = clips[t["scale_ref"]]
     heights = [np.ptp(np.where(masks[k].any(1))[0]) + 1 for k in ref]
-    s = BODY_H * UP / float(np.median(heights))                  # source px -> 4x-target px
+    s = s0 = BODY_H * UP / float(np.median(heights))             # source px -> 4x-target px
+    # row_scale {"<source row>": factor}: generators often draw some views bigger than others
     uniq = list(dict.fromkeys(k for v in clips.values() for k in v))
     cols = int(np.ceil(np.sqrt(len(uniq))))
     rows = (len(uniq) + cols - 1) // cols
@@ -492,6 +497,7 @@ def make_frames(spec, log=print):
     for k, (r, i) in enumerate(uniq):
         x0, y0, _, _ = boxes[r][i]
         xs_ = stretch[(r, i)]
+        s = s0 * p.get("row_scale", {}).get(str(r), 1.0)
         m = masks[(r, i)]
         c = prep(rgb[y0:y0 + m.shape[0], x0:x0 + m.shape[1]], m)
         c = smooth_shading(c, m, p["smooth"] / (s / UP), spec)
@@ -555,7 +561,7 @@ def make_frames(spec, log=print):
             c = cell_view(small, k, cols, CELL)
             c[:] = add_wraps(c, spec, p["wraps"])
     ncol = len(np.unique(small[small[..., 3] > 0][:, :3], axis=0))
-    log(f"{len(uniq)} frames, scale {s / UP:.3f}, {ncol} colours")
+    log(f"{len(uniq)} frames, scale {s0 / UP:.3f}, {ncol} colours")
     return small, cols, {k: [uniq.index(x) for x in v] for k, v in clips.items()}
 
 

@@ -1,0 +1,194 @@
+[
+ {
+  "name": "idle_up",
+  "row": 0,
+  "n": 4,
+  "durations": [
+   240,
+   240,
+   240,
+   240
+  ],
+  "once": false
+ },
+ {
+  "name": "idle_left",
+  "row": 1,
+  "n": 4,
+  "durations": [
+   240,
+   240,
+   240,
+   240
+  ],
+  "once": false
+ },
+ {
+  "name": "idle_down",
+  "row": 2,
+  "n": 4,
+  "durations": [
+   240,
+   240,
+   240,
+   240
+  ],
+  "once": false
+ },
+ {
+  "name": "idle_right",
+  "row": 3,
+  "n": 4,
+  "durations": [
+   240,
+   240,
+   240,
+   240
+  ],
+  "once": false
+ },
+ {
+  "name": "walk_up",
+  "row": 4,
+  "n": 8,
+  "durations": [
+   120,
+   120,
+   120,
+   120,
+   120,
+   120,
+   120,
+   120
+  ],
+  "once": false
+ },
+ {
+  "name": "walk_left",
+  "row": 5,
+  "n": 8,
+  "durations": [
+   120,
+   120,
+   120,
+   120,
+   120,
+   120,
+   120,
+   120
+  ],
+  "once": false
+ },
+ {
+  "name": "walk_down",
+  "row": 6,
+  "n": 8,
+  "durations": [
+   120,
+   120,
+   120,
+   120,
+   120,
+   120,
+   120,
+   120
+  ],
+  "once": false
+ },
+ {
+  "name": "walk_right",
+  "row": 7,
+  "n": 8,
+  "durations": [
+   120,
+   120,
+   120,
+   120,
+   120,
+   120,
+   120,
+   120
+  ],
+  "once": false
+ },
+ {
+  "name": "smash_up",
+  "row": 8,
+  "n": 6,
+  "durations": [
+   120,
+   160,
+   200,
+   70,
+   220,
+   140
+  ],
+  "once": false
+ },
+ {
+  "name": "smash_left",
+  "row": 9,
+  "n": 6,
+  "durations": [
+   120,
+   160,
+   200,
+   70,
+   220,
+   140
+  ],
+  "once": false
+ },
+ {
+  "name": "smash_down",
+  "row": 10,
+  "n": 6,
+  "durations": [
+   120,
+   160,
+   200,
+   70,
+   220,
+   140
+  ],
+  "once": false
+ },
+ {
+  "name": "smash_right",
+  "row": 11,
+  "n": 6,
+  "durations": [
+   120,
+   160,
+   200,
+   70,
+   220,
+   140
+  ],
+  "once": false
+ },
+ {
+  "name": "death_left",
+  "row": 12,
+  "n": 4,
+  "durations": [
+   120,
+   180,
+   240,
+   600
+  ],
+  "once": true
+ },
+ {
+  "name": "death_right",
+  "row": 13,
+  "n": 4,
+  "durations": [
+   120,
+   180,
+   240,
+   600
+  ],
+  "once": true
+ }
+]

@@ -30,7 +30,9 @@ Run every tool from the repo root with `uv run python -I tools/<tool>.py ...`.
 
 ## 1. Intake: is the sheet good enough?
 
-1. Copy the source into `assets/<name>/src/` (downloads are untrusted, so use `-I`).
+1. Copy the source into `assets/<name>/src/` (downloads are untrusted, so use `-I`). Several sheets for one
+   sprite (the Gemini `/game-art` skill makes walk, action and extra separately): stack them with
+   `tools/stitch_sheets.py`, dropping stray pieces with `--drop x,y`, and record the command in the spec's `stitch`.
 2. `uv run python -I tools/sheet_assess.py assets/<name>/src/<file> [--spec assets/<name>/sprite.json] --out assets/<name>/assess`
    It reports background type, rows and figures per row, ground line, scale factor, pixel-grid test, dirt and (with a
    spec) missing views, writes `contact.png` (figures labelled `row:frame`), and, whenever the verdict is not GO,
@@ -140,6 +142,10 @@ What changed, the numbers before and after (churn and the style check), what eac
 - Measure the style, do not eyeball it. The first "finished" mummy had the right pixel scale but median brightness 36
   against LPC's 141-183 and a 42% near-black interior against ≤10%: it read as a dark blob next to LPC monsters. Value
   shares, thin_darks and lighter patch colours fixed it; churn stayed about the same.
+- Light figures (white fur) with a thin outline: the dirt step floods through outline gaps; it now falls back to
+  keeping the figure when it would remove over 25%. If the intake reports a large "dirt" share, look before trusting it.
+- Generators draw views at different sizes (the yeti's back view 9% taller than its front): even them with
+  `params.row_scale` (`{"<source row>": factor}`) so the sprite does not grow when it turns.
 - Widening changes what fits in the 64 px cell: check frames touching the cell edge after changing `x_stretch`.
 
 - Nearest-neighbour on non-grid AI art gives noise and area averaging gives grain; neither is the fix. The fix is

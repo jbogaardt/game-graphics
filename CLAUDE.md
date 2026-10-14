@@ -31,6 +31,7 @@ especially `rules://92-generated-art-tells` and `rules://32-heads-and-faces`).
 | `sheet_assess.py <img> [--spec S] [--out D]` | Intake report: background, rows and figures, ground line, scale, pixel-grid test, dirt, coverage of the views the game needs; writes `contact.png` and, unless the verdict is GO, `regen_prompt.md` (a filled-in prompt for Gemini asking for exactly what is wrong or missing); verdict GO / GO WITH GAPS / REGENERATE |
 | `spritekit.py` | Shared pipeline (key, dirt removal, luminance blur, form light, designed-ramp mapping, unfake on one atlas, register, stabilise, crumbs, wraps, head-anchored patches, metrics) |
 | `build_sprite.py <spec> [--preview]` | Spec to `layout.png`, `preview.png`, `<name>.aseprite` (Character + selective Outline layer, tags, durations) and `dist/<name>_sheet.png/.json` via the aseprite CLI. Close the sprite in Aseprite first |
+| `stitch_sheets.py <out> <sheet>... [--drop x,y]` | Stack several generated sheets (the Gemini skill's walk / action / extra) into one source on the key colour; `--drop` erases a stray piece (floating duplicate head, fused frames) |
 | `sprite_metrics.py <spec>` | Per-tag churn (sparkle), isolated pixels, feet rows, colours used, and the style check against the LPC reference characters (height, width, median brightness, near-black interior, outline thickness, colours); exits 3 if the style is off |
 | `export_doll.py <spec>` | `dist/<name>_sheet.*` to the game's doll layout `dist/<name>_doll.png/.json` (832x1600, mirrors `ANIMS` in `../me_rpg/src/sprites/doll.ts`), listing fallbacks |
 | `mummy_frames.py`, `unfake_test.py` | Legacy experiments on the old `mummy1/2.jpeg` sources; not part of the workflow |
@@ -68,6 +69,28 @@ ranged attacks and `slash` for melee. LPC reference art: `../me_rpg/public/sprit
 - Shoot frame 1's bow tip touches the top of the 64 px cell.
 - Rebuild: `uv run python -I tools/build_sprite.py assets/mummy/sprite.json && uv run python -I tools/export_doll.py assets/mummy/sprite.json`.
 
+## Abominable snowman (`assets/abominable-snowman/`)
+
+- Source `src/yeti_v01_stitched.png`, from two Gemini skill sheets (walk `ozp1em…`, action `aq0mht…`; the stitch
+  command is in the spec's `stitch` field). Rows 8,8,8,8,8,6: walk down/up/right, front smash, back smash, side
+  (hunch, fist, lunge, knocked back, slump, lying). No ranged attack: the doll's cast and shoot reuse `smash`; hurt
+  is the side death. `src/…gemini-try1.jpeg` is the rejected first try (checkerboard), kept as the design reference.
+- Real pixel art at ~9.6x, so `smooth` 0.5 and `form_light` 20. The generator drew the back and side views 5-9%
+  bigger than the front: `row_scale` evens them. Palette 11: navy outline, violet-shifted 5-step fur, horn 3, glow 2.
+- Patch `face_front` (brow, cyan eyes, fangs) on every front frame; on the raised-arm and slam frames it is placed
+  with `anchor: abs`.
+- The generated side walk shuffles (feet barely move), so `make_legs.py` draws an 8-frame stride (`legs_side_0-7`,
+  stamped at a fixed position on `walk_right`) into `patches.json`. Rerun it after changing `POSES`, then rebuild.
+- Style: height 48, width 33 (a big mob; tolerance 8), median brightness 200 (white fur; tolerance 45), dark
+  interior 2%, ring 3%. Churn: walks 15-22%, idles 7-10%, smash 12-48%, death 38%.
+
+## Gemini skill (`gemini/game-art/`)
+
+The user's Gemini skill `/game-art` makes the source sheets: `SKILL.md` (steps, checklist, reply template, common
+mistakes) plus `style-guide.md`, `layouts.md` and `prompt-template.md`. It makes one sheet per turn (Gemini
+generates one image at a time): a character is three turns, `walk`, then "next" for `action` and `extra`; stitch them into one source before
+intake. Keep the layouts and style in step with the target above. Upload: zip the `game-art/` folder.
+
 ## Sprite viewer (`viewer/`)
 
 `cd viewer && npm start` serves http://localhost:5173/?sprite=<name>, a minimal PixiJS page that plays
@@ -82,6 +105,9 @@ rebuild. See `viewer/README.md`.
 
 uv project (`pyproject.toml`, `uv.lock`; `.venv/` ignored). Dependencies: `pillow`, `numpy`, `unfake` (pulls in
 `opencv-python`; Python >= 3.12). Add dependencies with `uv add`. `aseprite` must be on PATH for builds.
+
+Builds are not bit-for-bit repeatable (about 2% of pixels differ between two runs of the same spec), so a rebuild
+shows up in git even when nothing changed.
 
 unfake findings: auto scale detection fails on smooth AI art (no grid); `manual_scale` with `dominant` works as a
 grid snapper on frames prepared at an exact integer multiple (the pipeline uses 4x), but it is a downscaler, not a
